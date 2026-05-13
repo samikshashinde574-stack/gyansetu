@@ -5,7 +5,8 @@ from datetime import datetime
 from groq import Groq
 from fpdf import FPDF
 import pdfplumber
-
+import pytesseract
+from pdf2image import convert_from_bytes
 def get_groq_client():
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
@@ -88,9 +89,21 @@ def build_pdf(questions, difficulty, include_answers=True):
 def extract_text_from_pdf(uploaded_file):
     with pdfplumber.open(uploaded_file) as pdf:
         pages = [page.extract_text() or "" for page in pdf.pages]
+
     text = "\n".join(pages).strip()
+
+    # If very little text found, use OCR
+    if len(text) < 500:
+        uploaded_file.seek(0)
+
+        images = convert_from_bytes(uploaded_file.read())
+
+        for img in images:
+            text += pytesseract.image_to_string(img)
+
     if not text:
         raise ValueError("Could not extract text from PDF.")
+
     return text
 
 def load_quiz_from_history(entry):
